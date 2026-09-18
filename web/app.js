@@ -97,18 +97,69 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 2. Clear URL input
+  // 2. Botão Destaque: Pegar Top 50 Brasil
+  const btnLoadTop50 = document.getElementById('btnLoadTop50');
+  const TOP_50_BRASIL_URL = 'https://open.spotify.com/playlist/37i9dQZEVXbMXbN3EUUhlg';
+
+  if (btnLoadTop50) {
+    btnLoadTop50.addEventListener('click', () => {
+      playlistUrlInput.value = TOP_50_BRASIL_URL;
+      playlistUrlInput.focus();
+
+      btnLoadTop50.classList.add('selected');
+      const actionPill = btnLoadTop50.querySelector('.btn-action-pill');
+      if (actionPill) {
+        actionPill.innerHTML = '✓ Top 50 Selecionada!';
+        actionPill.style.background = '#ffffff';
+        actionPill.style.color = '#000000';
+      }
+
+      playlistUrlInput.classList.add('highlight-green');
+      setTimeout(() => {
+        playlistUrlInput.classList.remove('highlight-green');
+        if (actionPill) {
+          actionPill.innerHTML = '⚡ Inserir Top 50';
+          actionPill.style.background = 'var(--spotify-green)';
+          actionPill.style.color = '#000000';
+        }
+      }, 1500);
+    });
+  }
+
+  // Atualiza estado do botão ao digitar ou colar na caixa de texto
+  if (playlistUrlInput) {
+    playlistUrlInput.addEventListener('input', () => {
+      if (btnLoadTop50) {
+        if (playlistUrlInput.value.includes('37i9dQZEVXbMXbN3EUUhlg')) {
+          btnLoadTop50.classList.add('selected');
+        } else {
+          btnLoadTop50.classList.remove('selected');
+        }
+      }
+    });
+  }
+
+  // 3. Limpar URL input
   if (btnClearUrl) {
     btnClearUrl.addEventListener('click', () => {
       playlistUrlInput.value = '';
+      if (btnLoadTop50) btnLoadTop50.classList.remove('selected');
       playlistUrlInput.focus();
     });
   }
 
-  // 3. Example Pills
+  // 4. Example Pills
   pillBtns.forEach(pill => {
     pill.addEventListener('click', () => {
-      playlistUrlInput.value = pill.getAttribute('data-url');
+      const url = pill.getAttribute('data-url');
+      playlistUrlInput.value = url;
+      if (btnLoadTop50) {
+        if (url.includes('37i9dQZEVXbMXbN3EUUhlg')) {
+          btnLoadTop50.classList.add('selected');
+        } else {
+          btnLoadTop50.classList.remove('selected');
+        }
+      }
     });
   });
 

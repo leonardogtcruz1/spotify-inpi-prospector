@@ -87,27 +87,47 @@
 
         <!-- Tab 1: Playlist Link Form -->
         <div class="tab-content active" id="playlistTab">
+          <!-- Botão Destaque: Pegar Top 50 Brasil (Acima do input) -->
+          <div class="top50-action-container">
+            <button type="button" class="btn-top50-fetch selected" id="btnLoadTop50">
+              <div class="top50-badge-flag">
+                <span class="flag-icon">🇧🇷</span>
+                <span class="live-dot-pulse"></span>
+              </div>
+              <div class="top50-btn-details">
+                <div class="top50-btn-title">
+                  <strong>Pegar Top 50 Brasil Oficial</strong>
+                  <span class="top50-chip-tag">Em Alta Hoje</span>
+                </div>
+                <div class="top50-btn-desc">Carrega as 50 músicas mais tocadas no Brasil em 1 clique</div>
+              </div>
+              <div class="top50-btn-action">
+                <span class="btn-action-pill">⚡ Inserir Top 50</span>
+              </div>
+            </button>
+          </div>
+
           <div class="form-group">
             <label for="playlistUrlInput">URL da Playlist do Spotify:</label>
             <div class="input-with-icon">
               <input 
                 type="url" 
                 id="playlistUrlInput" 
-                placeholder="Ex: https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd"
-                value="https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd"
+                placeholder="Ex: https://open.spotify.com/playlist/37i9dQZEVXbMXbN3EUUhlg"
+                value="https://open.spotify.com/playlist/37i9dQZEVXbMXbN3EUUhlg"
               >
               <button class="btn-clear" id="btnClearUrl" type="button" title="Limpar">✕</button>
             </div>
             <div class="input-hint">
-              <span>💡 Dica: Funciona com RapCaviar, Esquenta Sertanejo, Top Brasil, Viva Latino e playlists de usuários sem precisar de API.</span>
+              <span>💡 Dica: Clique no botão acima para o Top 50 Brasil oficial ou cole a URL de qualquer playlist.</span>
             </div>
           </div>
 
           <div class="quick-examples">
-            <span class="examples-label">Testar com exemplos:</span>
+            <span class="examples-label">Outras playlists de exemplo:</span>
+            <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DX0FOF1IUWK1W">Top Brasil</button>
             <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd">RapCaviar</button>
             <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC">Viva Latino</button>
-            <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DWYkaDif7Ztbp">Afro Hits</button>
           </div>
         </div>
 
