@@ -48,6 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnClearLogs = document.getElementById('btnClearLogs');
   const btnNavToggleLogs = document.getElementById('btnNavToggleLogs');
   const btnScrollToLogs = document.getElementById('btnScrollToLogs');
+
+  // Error Banner Elements (Vermelho vivo)
+  const errorBannerCard = document.getElementById('errorBannerCard');
+  const errorMessageText = document.getElementById('errorMessageText');
+  const btnErrorCopy = document.getElementById('btnErrorCopy');
+  const btnErrorViewLogs = document.getElementById('btnErrorViewLogs');
+  const btnErrorRetry = document.getElementById('btnErrorRetry');
   
   // Results Elements
   const resultsSection = document.getElementById('resultsSection');
@@ -296,6 +303,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Ações do Banner de Erro em Destaque Vermelho
+  if (btnErrorCopy) {
+    btnErrorCopy.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await copyLogsToClipboard();
+      const originalText = btnErrorCopy.textContent;
+      btnErrorCopy.textContent = '✓ Logs Copiados!';
+      setTimeout(() => {
+        btnErrorCopy.textContent = originalText;
+      }, 2500);
+    });
+  }
+
+  if (btnErrorViewLogs) {
+    btnErrorViewLogs.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setConsoleOpen(true);
+      if (debugLogsDrawer) {
+        debugLogsDrawer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+
+  if (btnErrorRetry) {
+    btnErrorRetry.addEventListener('click', (e) => {
+      e.stopPropagation();
+      btnStartPipeline.click();
+    });
+  }
+
   if (btnClearLogs) {
     btnClearLogs.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -393,8 +430,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reset UI State
     btnStartPipeline.disabled = true;
+    btnStartPipeline.classList.remove('btn-failed');
     btnStartPipeline.innerHTML = '<span class="btn-icon">⏳</span> Iniciando Robô...';
     
+    // Esconder banner de erro anterior se houver
+    if (errorBannerCard) errorBannerCard.style.display = 'none';
+
     allArtists = [];
     renderTable();
     totalLogEvents = 0;
@@ -404,14 +445,20 @@ document.addEventListener('DOMContentLoaded', () => {
     progressSection.style.display = 'block';
     resultsSection.style.display = 'none';
     progressPercentBadge.textContent = '0%';
+    progressPercentBadge.style.color = '';
     progressBarFill.style.width = '0%';
+    progressBarFill.style.background = '';
     progressStepTitle.textContent = 'Conectando ao serviço...';
     progressSubtitle.textContent = 'Aguarde o carregamento inicial da playlist...';
 
     // Ativa linha de progresso no topo e badge de status
     if (topProgressContainer) topProgressContainer.style.display = 'block';
-    if (topProgressBar) topProgressBar.style.width = '5%';
+    if (topProgressBar) {
+      topProgressBar.classList.remove('error-bar');
+      topProgressBar.style.width = '5%';
+    }
     if (headerStatusPill) {
+      headerStatusPill.classList.remove('error-pill');
       headerStatusPill.style.display = 'flex';
       if (headerStatusText) headerStatusText.textContent = 'Iniciando robô...';
     }
@@ -431,25 +478,75 @@ document.addEventListener('DOMContentLoaded', () => {
           body: formData
         });
         if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.detail || 'Erro ao iniciar o processamento.');
+          let errDetail = 'Erro ao iniciar o processamento.';
+          try {
+            const errData = await response.json();
+            errDetail = errData.detail || errDetail;
+          } catch (_) {}
+          throw new Error(errDetail);
         }
         const resData = await response.json();
         currentJobId = resData.job_id;
         listenToJobEvents(currentJobId);
       } catch (fallbackErr) {
-        alert(`Erro: ${fallbackErr.message || err.message}`);
-        resetUIAfterError();
+        showAppError(fallbackErr.message || err.message);
       }
     }
   });
 
-  function resetUIAfterError() {
-    if (topProgressContainer) topProgressContainer.style.display = 'none';
-    if (headerStatusPill) headerStatusPill.style.display = 'none';
-    document.title = 'Spotify & INPI Lead Prospector';
+  // Exibe erro crítico de forma destacada em vermelho vivo
+  function showAppError(errMsg) {
+    const cleanMsg = (errMsg || 'Ocorreu um erro inesperado durante a execução da automação.').toString();
+    console.error('App Pipeline Error:', cleanMsg);
+
+    // 1. Mostrar banner vermelho com destaque
+    if (errorBannerCard) {
+      errorBannerCard.style.display = 'flex';
+      if (errorMessageText) {
+        errorMessageText.textContent = cleanMsg;
+      }
+      errorBannerCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // 2. Destacar barra superior e status pill em vermelho
+    if (topProgressContainer) topProgressContainer.style.display = 'block';
+    if (topProgressBar) {
+      topProgressBar.classList.add('error-bar');
+      topProgressBar.style.width = '100%';
+    }
+    if (headerStatusPill) {
+      headerStatusPill.style.display = 'flex';
+      headerStatusPill.classList.add('error-pill');
+      if (headerStatusText) headerStatusText.textContent = '⚠️ Erro na automação';
+    }
+
+    // 3. Atualizar card de progresso em vermelho
+    if (progressBarFill) {
+      progressBarFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+    }
+    if (progressStepTitle) {
+      progressStepTitle.innerHTML = '<span style="color: #ef4444; font-weight: 700;">⚠️ Automação Interrompida com Erro</span>';
+    }
+    if (progressSubtitle) {
+      progressSubtitle.innerHTML = `<span style="color: #f87171;">${cleanMsg}</span>`;
+    }
+    if (progressPercentBadge) {
+      progressPercentBadge.style.color = '#ef4444';
+      progressPercentBadge.textContent = 'Erro';
+    }
+
+    // 4. Botão de ação volta como "Tentar Novamente" com estilo vermelho
     btnStartPipeline.disabled = false;
-    btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Automação Completa';
+    btnStartPipeline.classList.add('btn-failed');
+    btnStartPipeline.innerHTML = '<span class="btn-icon">⚠️</span> Falhou — Tentar Novamente';
+
+    document.title = '❌ [Erro] Spotify Prospector';
+
+    // 5. Registrar log crítico em destaque
+    appendLog(`[ERRO CRÍTICO] ${cleanMsg}`);
+
+    // 6. Abrir o console de logs para facilitar diagnóstico
+    setConsoleOpen(true);
   }
 
   // Função para disparar o download automático imediato da planilha gerada
@@ -595,7 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
               completedReceived = true;
               onJobCompleted(data);
             } else if (eventType === 'error') {
-              throw new Error(data.message || 'Erro durante a execução.');
+              showAppError(data.message || 'Erro durante a execução.');
+              return;
             }
           } catch (pe) {
             console.warn('Erro ao processar evento de stream:', pe);
@@ -622,14 +720,13 @@ document.addEventListener('DOMContentLoaded', () => {
             onJobCompleted(data);
             return;
           } else if (data.status === 'error') {
-            alert(`Erro: ${data.error || 'Falha no processamento'}`);
-            resetUIAfterError();
+            showAppError(data.error || 'Falha no processamento.');
             return;
           }
         }
       } catch (_) {}
     }
-    resetUIAfterError();
+    showAppError('A conexão com o servidor foi interrompida antes da conclusão da automação. Verifique os logs abaixo ou tente novamente.');
   }
 
   // 8. EventSource (SSE) Listener Fallback
@@ -673,6 +770,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = JSON.parse(e.data);
       activeEventSource.close();
       onJobCompleted(data);
+    });
+
+    activeEventSource.addEventListener('error', (e) => {
+      let msg = 'Erro no servidor durante a execução.';
+      try {
+        const d = JSON.parse(e.data);
+        if (d && d.message) msg = d.message;
+      } catch (_) {}
+      activeEventSource.close();
+      showAppError(msg);
     });
 
     activeEventSource.onerror = async () => {

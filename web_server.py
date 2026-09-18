@@ -80,6 +80,11 @@ def normalize_text(text: str) -> str:
     return unicodedata.normalize('NFKD', str(text)).encode('ASCII', 'ignore').decode('ASCII').strip().lower()
 
 
+def safe_json_dumps(obj: Any) -> str:
+    """Serializa com segurança qualquer objeto/dicionário para JSON, convertendo datetimes e tipos especiais"""
+    return json.dumps(obj, default=str, ensure_ascii=False)
+
+
 def broadcast_event(job_id: str, event_type: str, data: Any):
     """Envia um evento SSE para todos os clientes conectados ao job_id de forma thread-safe"""
     payload = {
@@ -506,14 +511,14 @@ async def run_job_stream(
                 "progress": job["progress"],
                 "summary": job["summary"]
             }
-            yield f"event: init\ndata: {json.dumps(initial_data)}\n\n"
+            yield f"event: init\ndata: {safe_json_dumps(initial_data)}\n\n"
 
             while True:
                 if await request.is_disconnected():
                     break
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=1.0)
-                    yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
+                    yield f"event: {payload['event']}\ndata: {safe_json_dumps(payload['data'])}\n\n"
                     if payload["event"] in ["completed", "error"]:
                         break
                 except asyncio.TimeoutError:
@@ -638,14 +643,14 @@ async def stream_job_events(job_id: str, request: Request):
                 "current_artist": job.get("current_artist"),
                 "logs": job["logs"][-20:]
             }
-            yield f"event: init\ndata: {json.dumps(initial_data)}\n\n"
+            yield f"event: init\ndata: {safe_json_dumps(initial_data)}\n\n"
 
             # Se o job já estiver finalizado, envia completed imediatamente
             if job["status"] == "completed":
-                yield f"event: completed\ndata: {json.dumps({'output_filename': job['output_filename'], 'download_url': f'/api/download/{job_id}', 'file_base64': job.get('file_base64', ''), 'summary': job['summary']})}\n\n"
+                yield f"event: completed\ndata: {safe_json_dumps({'output_filename': job['output_filename'], 'download_url': f'/api/download/{job_id}', 'file_base64': job.get('file_base64', ''), 'summary': job['summary']})}\n\n"
                 return
             elif job["status"] == "error":
-                yield f"event: error\ndata: {json.dumps({'message': job['error']})}\n\n"
+                yield f"event: error\ndata: {safe_json_dumps({'message': job['error']})}\n\n"
                 return
 
             while True:
@@ -653,7 +658,7 @@ async def stream_job_events(job_id: str, request: Request):
                     break
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=1.0)
-                    yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
+                    yield f"event: {payload['event']}\ndata: {safe_json_dumps(payload['data'])}\n\n"
                     if payload["event"] in ["completed", "error"]:
                         break
                 except asyncio.TimeoutError:
