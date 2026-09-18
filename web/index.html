@@ -160,7 +160,18 @@
               <input type="checkbox" id="skipLiveInpiCheckbox" checked>
               <span class="toggle-slider"></span>
               <span class="toggle-label">
-                <strong>Modo Rápido INPI</strong> (Usa histórico local + links inteligentes diretos de 1 clique)
+                <strong>Modo Rápido INPI</strong>
+                <span class="info-tooltip-wrapper" onclick="event.preventDefault(); event.stopPropagation();">
+                  <span class="info-circle" tabindex="0" role="button" aria-label="Informações sobre o Modo Rápido INPI">?</span>
+                  <span class="tooltip-popover">
+                    <span class="tooltip-popover-title">⚡ O que é o Modo Rápido INPI?</span>
+                    <span class="tooltip-popover-text">
+                      <strong>• Ativado (Recomendado):</strong> Conclui em menos de 1 minuto! Usa a base de marcas histórica e gera links inteligentes diretos de 1 clique no INPI para conferir os leads sem riscos de lentidão ou bloqueios de IP.<br><br>
+                      <strong>• Desativado:</strong> Tenta fazer varredura ao vivo pesquisando cada um dos 50 a 100 artistas direto no site do governo, o que demora vários minutos e pode oscilar por instabilidade do portal do INPI.
+                    </span>
+                  </span>
+                </span>
+                <span class="toggle-hint-text">(Usa histórico local + links diretos de 1 clique)</span>
               </span>
             </label>
           </div>

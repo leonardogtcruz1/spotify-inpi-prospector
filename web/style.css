@@ -594,10 +594,112 @@ input:focus {
 .toggle-label {
   font-size: 0.88rem;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .toggle-label strong {
   color: var(--text-main);
+}
+
+.toggle-hint-text {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* Interrogação e Tooltip Explicativo do Modo Rápido */
+.info-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.info-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.info-tooltip-wrapper:hover .info-circle,
+.info-tooltip-wrapper:focus-within .info-circle {
+  background: var(--spotify-green);
+  color: #000000;
+  border-color: var(--spotify-green);
+  box-shadow: 0 0 10px rgba(30, 215, 96, 0.6);
+  transform: scale(1.12);
+}
+
+.tooltip-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-30%);
+  width: 320px;
+  max-width: calc(100vw - 36px);
+  background: #171922;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.75), 0 0 18px rgba(30, 215, 96, 0.15);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.tooltip-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 30%;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #171922 transparent transparent transparent;
+}
+
+.info-tooltip-wrapper:hover .tooltip-popover,
+.info-tooltip-wrapper:focus-within .tooltip-popover {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-30%) translateY(-3px);
+}
+
+.tooltip-popover-title {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--spotify-green);
+  margin-bottom: 8px;
+}
+
+.tooltip-popover-text {
+  display: block;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  font-weight: 400;
+}
+
+.tooltip-popover-text strong {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .btn-primary {
