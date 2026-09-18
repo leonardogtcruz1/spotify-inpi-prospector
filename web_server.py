@@ -70,7 +70,7 @@ app.add_middleware(
 
 # Armazenamento em memória de jobs e filas de SSE
 jobs: Dict[str, Dict[str, Any]] = {}
-job_subscribers: Dict[str, List[asyncio.Queue]] = {}
+job_subscribers: Dict[str, List[Any]] = {}
 job_lock = threading.Lock()
 
 
@@ -81,17 +81,24 @@ def normalize_text(text: str) -> str:
 
 
 def broadcast_event(job_id: str, event_type: str, data: Any):
-    """Envia um evento SSE para todos os clientes conectados ao job_id"""
+    """Envia um evento SSE para todos os clientes conectados ao job_id de forma thread-safe"""
     payload = {
         "event": event_type,
         "data": data,
         "timestamp": time.time()
     }
     with job_lock:
-        queues = job_subscribers.get(job_id, [])
-        for q in list(queues):
+        subscribers = job_subscribers.get(job_id, [])
+        for item in list(subscribers):
             try:
-                q.put_nowait(payload)
+                if isinstance(item, tuple):
+                    loop, q = item
+                    if loop.is_running():
+                        loop.call_soon_threadsafe(q.put_nowait, payload)
+                    else:
+                        q.put_nowait(payload)
+                else:
+                    item.put_nowait(payload)
             except Exception:
                 pass
 
@@ -298,8 +305,9 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
                 'inpi_search_url': search_url
             }
 
-        max_workers = 6
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        max_workers = 8
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        try:
             future_to_artist = {executor.submit(enrich_single_artist, name): name for name in unique_artists}
 
             for future in as_completed(future_to_artist):
@@ -359,8 +367,31 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
                 )
 
                 if time.time() - start_time > time_limit:
-                    append_job_log(job, "[!] Limite de tempo de execução alcançado. Finalizando planilha agora...")
+                    append_job_log(job, "[!] Limite de tempo de execução alcançado. Finalizando planilha com os artistas processados...")
+                    try:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                    except Exception:
+                        pass
                     break
+        finally:
+            try:
+                executor.shutdown(wait=False)
+            except Exception:
+                pass
+
+        # Garante que qualquer artista não concluído por timeout tenha registro padrão
+        for name in unique_artists:
+            if name not in artists_data:
+                search_url = build_inpi_direct_url(name)
+                count_val = artist_counts[name]
+                artists_data[name] = {
+                    'name': name, 'count': count_val, 'count_display': str(count_val) if count_val > 1 else "",
+                    'monthly_listeners': None, 'monthly_listeners_fmt': 'N/D', 'spotify_url': None,
+                    'instagram': None, 'ig_display': 'N/D', 'ig_url': None,
+                    'tiktok_url': None, 'tiktok_display': 'N/D', 'youtube_url': None, 'youtube_display': 'N/D',
+                    'tem_marca': False, 'inpi_status': 'SEM MARCA', 'inpi_records': None,
+                    'inpi_search_url': search_url
+                }
 
         # 5. Geração da Planilha Excel
         job["progress"] = {"step": 5, "step_name": "Construindo planilha Excel final", "percent": 95}
@@ -407,6 +438,101 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
 
 
 # --- ROTAS DA API ---
+
+@app.post("/api/jobs/run-stream")
+async def run_job_stream(
+    request: Request,
+    target_type: str = Form(...),
+    playlist_url: Optional[str] = Form(None),
+    skip_live_inpi: bool = Form(False),
+    file: Optional[UploadFile] = File(None)
+):
+    """
+    Executa o pipeline completo dentro de uma única conexão HTTP com streaming SSE.
+    Previne congelamento em ambientes serverless (Vercel) e garante entrega em tempo real.
+    """
+    job_id = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+
+    target_value = ""
+    if target_type == "playlist":
+        if not playlist_url or not playlist_url.strip():
+            raise HTTPException(status_code=400, detail="A URL da playlist é obrigatória.")
+        target_value = playlist_url.strip()
+    elif target_type == "file":
+        if not file:
+            raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
+        file_path = os.path.join(UPLOAD_DIR, f"{job_id}_{file.filename}")
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        target_value = file_path
+    else:
+        raise HTTPException(status_code=400, detail="target_type inválido.")
+
+    job = {
+        "id": job_id,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "target_type": target_type,
+        "target_value": target_value,
+        "playlist_title": "",
+        "skip_live_inpi": skip_live_inpi,
+        "progress": {"step": 0, "step_name": "Iniciando...", "percent": 0},
+        "current_artist": None,
+        "summary": {"total_tracks": 0, "total_artists": 0, "sem_marca": 0, "com_marca": 0},
+        "artists": [],
+        "output_file": None,
+        "output_filename": None,
+        "error": None,
+        "logs": []
+    }
+
+    jobs[job_id] = job
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    with job_lock:
+        job_subscribers[job_id] = [(loop, queue)]
+
+    # Inicia o pipeline de extração e enriquecimento em thread ligada à requisição ativa
+    asyncio.create_task(
+        asyncio.to_thread(run_pipeline_sync, job_id, target_type, target_value, skip_live_inpi)
+    )
+
+    async def event_generator():
+        try:
+            initial_data = {
+                "job_id": job_id,
+                "status": "running",
+                "progress": job["progress"],
+                "summary": job["summary"]
+            }
+            yield f"event: init\ndata: {json.dumps(initial_data)}\n\n"
+
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
+                    if payload["event"] in ["completed", "error"]:
+                        break
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            with job_lock:
+                if job_id in job_subscribers:
+                    job_subscribers[job_id] = [item for item in job_subscribers[job_id] if (item[1] if isinstance(item, tuple) else item) != queue]
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 
 @app.post("/api/jobs")
 async def create_job(
@@ -494,16 +620,18 @@ async def stream_job_events(job_id: str, request: Request):
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado.")
 
+    loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
     with job_lock:
         if job_id not in job_subscribers:
             job_subscribers[job_id] = []
-        job_subscribers[job_id].append(queue)
+        job_subscribers[job_id].append((loop, queue))
 
     async def event_generator():
         try:
             # Envia estado inicial
             initial_data = {
+                "job_id": job_id,
                 "status": job["status"],
                 "progress": job["progress"],
                 "summary": job["summary"],
@@ -514,7 +642,7 @@ async def stream_job_events(job_id: str, request: Request):
 
             # Se o job já estiver finalizado, envia completed imediatamente
             if job["status"] == "completed":
-                yield f"event: completed\ndata: {json.dumps({'output_filename': job['output_filename'], 'download_url': f'/api/download/{job_id}', 'summary': job['summary']})}\n\n"
+                yield f"event: completed\ndata: {json.dumps({'output_filename': job['output_filename'], 'download_url': f'/api/download/{job_id}', 'file_base64': job.get('file_base64', ''), 'summary': job['summary']})}\n\n"
                 return
             elif job["status"] == "error":
                 yield f"event: error\ndata: {json.dumps({'message': job['error']})}\n\n"
@@ -533,8 +661,8 @@ async def stream_job_events(job_id: str, request: Request):
                     yield ": keep-alive\n\n"
         finally:
             with job_lock:
-                if job_id in job_subscribers and queue in job_subscribers[job_id]:
-                    job_subscribers[job_id].remove(queue)
+                if job_id in job_subscribers:
+                    job_subscribers[job_id] = [item for item in job_subscribers[job_id] if (item[1] if isinstance(item, tuple) else item) != queue]
 
     return StreamingResponse(
         event_generator(),

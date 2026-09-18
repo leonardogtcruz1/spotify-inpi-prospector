@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     allArtists = [];
     renderTable();
-    consoleOutput.textContent = 'Iniciando conexão...\n';
+    consoleOutput.textContent = 'Conectando ao serviço em streaming contínuo...\n';
     
     progressSection.style.display = 'block';
     resultsSection.style.display = 'none';
@@ -231,29 +231,36 @@ document.addEventListener('DOMContentLoaded', () => {
     progressSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || 'Erro ao iniciar o processamento.');
-      }
-
-      const resData = await response.json();
-      currentJobId = resData.job_id;
-      listenToJobEvents(currentJobId);
-
+      await runStreamingPipeline(formData);
     } catch (err) {
-      alert(`Erro: ${err.message}`);
-      if (topProgressContainer) topProgressContainer.style.display = 'none';
-      if (headerStatusPill) headerStatusPill.style.display = 'none';
-      document.title = 'Spotify & INPI Lead Prospector';
-      btnStartPipeline.disabled = false;
-      btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Automação Completa';
+      console.warn('Falha no streaming direto, tentando fallback padrão...', err);
+      // Fallback para POST /api/jobs se o streaming falhar
+      try {
+        const response = await fetch('/api/jobs', {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || 'Erro ao iniciar o processamento.');
+        }
+        const resData = await response.json();
+        currentJobId = resData.job_id;
+        listenToJobEvents(currentJobId);
+      } catch (fallbackErr) {
+        alert(`Erro: ${fallbackErr.message || err.message}`);
+        resetUIAfterError();
+      }
     }
   });
+
+  function resetUIAfterError() {
+    if (topProgressContainer) topProgressContainer.style.display = 'none';
+    if (headerStatusPill) headerStatusPill.style.display = 'none';
+    document.title = 'Spotify & INPI Lead Prospector';
+    btnStartPipeline.disabled = false;
+    btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Automação Completa';
+  }
 
   // Função para disparar o download automático imediato da planilha gerada
   function triggerAutoDownload(data) {
@@ -288,7 +295,155 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 7. EventSource (SSE) Listener
+  function onJobCompleted(data) {
+    progressBarFill.style.width = '100%';
+    progressPercentBadge.textContent = '100%';
+    progressStepTitle.textContent = 'Processamento Concluído com Sucesso!';
+    progressSubtitle.textContent = 'Download da planilha iniciado automaticamente!';
+
+    if (topProgressBar) topProgressBar.style.width = '100%';
+    setTimeout(() => {
+      if (topProgressContainer) topProgressContainer.style.display = 'none';
+    }, 3000);
+
+    if (headerStatusPill) {
+      headerStatusPill.style.display = 'none';
+    }
+    document.title = '✓ Concluído! | Spotify & INPI Prospector';
+
+    const pulseDot = document.querySelector('.status-indicator');
+    if (pulseDot) {
+      pulseDot.classList.remove('live-pulse');
+      pulseDot.style.background = 'var(--spotify-green)';
+    }
+
+    btnStartPipeline.disabled = false;
+    btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Nova Automação';
+
+    // Show Results
+    resultsSection.style.display = 'block';
+    resultsFilenameText.textContent = `Arquivo pronto: ${data.output_filename} (Download iniciado automaticamente)`;
+    if (data.download_url) {
+      btnDownloadFile.href = data.download_url;
+      btnDownloadFile.setAttribute('download', data.output_filename);
+    }
+
+    if (data.summary) {
+      updateStats(data.summary);
+    }
+
+    // DISPARA O DOWNLOAD AUTOMÁTICO IMEDIATO
+    triggerAutoDownload(data);
+
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // 7. Streaming HTTP com ReadableStream (evita congelamento em Serverless)
+  async function runStreamingPipeline(formData) {
+    const response = await fetch('/api/jobs/run-stream', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      let msg = 'Erro ao iniciar fluxo em tempo real.';
+      try {
+        const errJson = await response.json();
+        msg = errJson.detail || msg;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let completedReceived = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop(); // Mantém o pedaço restante
+
+      for (const chunk of chunks) {
+        const trimmed = chunk.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue; // Keep-alive
+
+        const lines = trimmed.split('\n');
+        let eventType = 'message';
+        let dataStr = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            dataStr = line.slice(6).trim();
+          }
+        }
+
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr);
+            if (eventType === 'init') {
+              currentJobId = data.job_id;
+              if (data.progress) updateProgress(data.progress);
+            } else if (eventType === 'progress') {
+              updateProgress(data);
+            } else if (eventType === 'log') {
+              consoleOutput.textContent += data.line + '\n';
+              scrollConsoleToBottom();
+            } else if (eventType === 'artist_done') {
+              if (data.progress) updateProgress(data.progress);
+              if (data.current_artist) updateSpotlight(data.current_artist);
+              if (data.summary) updateStats(data.summary);
+
+              allArtists.push(data.artist);
+              updateFilterCounts();
+              renderTable();
+            } else if (eventType === 'completed') {
+              completedReceived = true;
+              onJobCompleted(data);
+            } else if (eventType === 'error') {
+              throw new Error(data.message || 'Erro durante a execução.');
+            }
+          } catch (pe) {
+            console.warn('Erro ao processar evento de stream:', pe);
+          }
+        }
+      }
+    }
+
+    if (!completedReceived && currentJobId) {
+      console.warn('Stream terminou antes do evento completed. Checando status via API...');
+      await checkJobCompletion(currentJobId);
+    }
+  }
+
+  // Polling de fallback caso a conexão caia
+  async function checkJobCompletion(jobId) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'completed') {
+            onJobCompleted(data);
+            return;
+          } else if (data.status === 'error') {
+            alert(`Erro: ${data.error || 'Falha no processamento'}`);
+            resetUIAfterError();
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    resetUIAfterError();
+  }
+
+  // 8. EventSource (SSE) Listener Fallback
   function listenToJobEvents(jobId) {
     if (activeEventSource) {
       activeEventSource.close();
@@ -318,16 +473,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     activeEventSource.addEventListener('artist_done', (e) => {
       const payload = JSON.parse(e.data);
-      const artist = payload.artist;
-      const progress = payload.progress;
-      const summary = payload.summary;
-      const current = payload.current_artist;
+      if (payload.progress) updateProgress(payload.progress);
+      if (payload.current_artist) updateSpotlight(payload.current_artist);
+      if (payload.summary) updateStats(payload.summary);
 
-      if (progress) updateProgress(progress);
-      if (current) updateSpotlight(current);
-      if (summary) updateStats(summary);
-
-      allArtists.push(artist);
+      allArtists.push(payload.artist);
       updateFilterCounts();
       renderTable();
     });
@@ -335,106 +485,13 @@ document.addEventListener('DOMContentLoaded', () => {
     activeEventSource.addEventListener('completed', (e) => {
       const data = JSON.parse(e.data);
       activeEventSource.close();
-
-      progressBarFill.style.width = '100%';
-      progressPercentBadge.textContent = '100%';
-      progressStepTitle.textContent = 'Processamento Concluído com Sucesso!';
-      progressSubtitle.textContent = 'Download da planilha iniciado automaticamente!';
-
-      if (topProgressBar) topProgressBar.style.width = '100%';
-      setTimeout(() => {
-        if (topProgressContainer) topProgressContainer.style.display = 'none';
-      }, 3000);
-
-      if (headerStatusPill) {
-        headerStatusPill.style.display = 'none';
-      }
-      document.title = '✓ Concluído! | Spotify & INPI Prospector';
-
-      const pulseDot = document.querySelector('.status-indicator');
-      if (pulseDot) {
-        pulseDot.classList.remove('live-pulse');
-        pulseDot.style.background = 'var(--spotify-green)';
-      }
-
-      btnStartPipeline.disabled = false;
-      btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Nova Automação';
-
-      // Show Results
-      resultsSection.style.display = 'block';
-      resultsFilenameText.textContent = `Arquivo pronto: ${data.output_filename} (Download iniciado automaticamente)`;
-      btnDownloadFile.href = data.download_url;
-      btnDownloadFile.setAttribute('download', data.output_filename);
-
-      if (data.summary) {
-        updateStats(data.summary);
-      }
-
-      // DISPARA O DOWNLOAD AUTOMÁTICO IMEDIATO
-      triggerAutoDownload(data);
-
-      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      onJobCompleted(data);
     });
 
     activeEventSource.onerror = async () => {
       console.warn('Conexão SSE oscilou. Verificando status do processamento via API...');
       activeEventSource.close();
-
-      // Tenta consultar o status do job via HTTP por algumas tentativas
-      for (let attempt = 0; attempt < 8; attempt++) {
-        try {
-          await new Promise(r => setTimeout(r, 2000));
-          const res = await fetch(`/api/jobs/${jobId}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.status === 'completed') {
-              progressBarFill.style.width = '100%';
-              progressPercentBadge.textContent = '100%';
-              progressStepTitle.textContent = 'Processamento Concluído com Sucesso!';
-              progressSubtitle.textContent = 'Download da planilha iniciado automaticamente!';
-
-              if (topProgressBar) topProgressBar.style.width = '100%';
-              setTimeout(() => {
-                if (topProgressContainer) topProgressContainer.style.display = 'none';
-              }, 2500);
-
-              if (headerStatusPill) headerStatusPill.style.display = 'none';
-              document.title = '✓ Concluído! | Spotify & INPI Prospector';
-
-              btnStartPipeline.disabled = false;
-              btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Nova Automação';
-
-              resultsSection.style.display = 'block';
-              resultsFilenameText.textContent = `Arquivo pronto: ${data.output_filename} (Download iniciado automaticamente)`;
-              btnDownloadFile.href = data.download_url;
-              btnDownloadFile.setAttribute('download', data.output_filename);
-
-              if (data.summary) {
-                updateStats(data.summary);
-              }
-
-              triggerAutoDownload(data);
-              resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              return;
-            } else if (data.status === 'error') {
-              alert(`Erro: ${data.error || 'Falha no processamento'}`);
-              break;
-            } else if (data.status === 'running') {
-              // Reconecta o streaming
-              listenToJobEvents(jobId);
-              return;
-            }
-          }
-        } catch {
-          // Próxima tentativa
-        }
-      }
-
-      if (topProgressContainer) topProgressContainer.style.display = 'none';
-      if (headerStatusPill) headerStatusPill.style.display = 'none';
-      document.title = 'Spotify & INPI Lead Prospector';
-      btnStartPipeline.disabled = false;
-      btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Automação Completa';
+      await checkJobCompletion(jobId);
     };
   }
 
