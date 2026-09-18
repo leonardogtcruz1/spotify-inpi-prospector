@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${igLink}</td>
           <td>${ytLink}</td>
           <td>${ttLink}</td>
-          <td>${statusBadge}</td>
+          <td class="col-status-inpi">${statusBadge}</td>
         </tr>
       `;
     }).join('');

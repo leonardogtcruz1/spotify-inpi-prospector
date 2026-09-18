@@ -1160,6 +1160,7 @@ input:focus {
 .table-scroll {
   max-height: 480px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 .data-table {
@@ -1178,11 +1179,13 @@ input:focus {
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
   z-index: 1;
+  white-space: nowrap;
 }
 
 .data-table td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
 }
 
 .data-table tr:hover td {
@@ -1193,30 +1196,53 @@ input:focus {
   color: var(--accent-blue);
   text-decoration: none;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .table-link:hover {
   text-decoration: underline;
 }
 
+/* Coluna Status INPI: nunca quebrar linha */
+.col-status-inpi,
+.data-table th:last-child,
+.data-table td:last-child {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  min-width: 155px;
+}
+
 .tag-sem-marca {
   background: var(--amber-lead-dim);
   color: var(--amber-lead);
   border: 1px solid var(--amber-lead-border);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   font-weight: 600;
   font-size: 0.75rem;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  flex-shrink: 0;
 }
 
 .tag-com-marca {
   background: rgba(56, 189, 248, 0.12);
   color: var(--accent-blue);
   border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   font-weight: 600;
   font-size: 0.75rem;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 /* MODAL */
