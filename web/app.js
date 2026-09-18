@@ -36,11 +36,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const spotlightYT = document.getElementById('spotlightYT');
   const spotlightTikTok = document.getElementById('spotlightTikTok');
   
-  // Console Elements
+  // Console & Debug Elements
+  const debugLogsDrawer = document.getElementById('debugLogsDrawer');
   const btnToggleConsole = document.getElementById('btnToggleConsole');
   const consoleBody = document.getElementById('consoleBody');
   const consoleArrow = document.getElementById('consoleArrow');
   const consoleOutput = document.getElementById('consoleOutput');
+  const logsCountBadge = document.getElementById('logsCountBadge');
+  const btnCopyLogs = document.getElementById('btnCopyLogs');
+  const btnCopyLogsText = document.getElementById('btnCopyLogsText');
+  const btnClearLogs = document.getElementById('btnClearLogs');
+  const btnNavToggleLogs = document.getElementById('btnNavToggleLogs');
+  const btnScrollToLogs = document.getElementById('btnScrollToLogs');
   
   // Results Elements
   const resultsSection = document.getElementById('resultsSection');
@@ -222,15 +229,145 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.drop-hint').style.display = 'none';
   }
 
-  // 5. Console Toggle
-  let consoleOpen = true;
+  // 5. Console & Debug Drawer Management (Sempre recolhido por padrão)
+  let consoleOpen = false;
+  let totalLogEvents = 0;
+
+  function appendLog(line) {
+    if (!consoleOutput) return;
+    if (consoleOutput.textContent.includes('Sistema pronto. Logs detalhados aparecerão')) {
+      consoleOutput.textContent = '';
+    }
+    const timestamp = new Date().toLocaleTimeString();
+    const formattedLine = line.startsWith('[') ? line : `[${timestamp}] ${line}`;
+    consoleOutput.textContent += formattedLine + '\n';
+    totalLogEvents++;
+    if (logsCountBadge) {
+      logsCountBadge.textContent = `${totalLogEvents} evento${totalLogEvents === 1 ? '' : 's'}`;
+    }
+    scrollConsoleToBottom();
+  }
+
+  function setConsoleOpen(open) {
+    consoleOpen = open;
+    if (consoleBody) {
+      consoleBody.style.display = consoleOpen ? 'block' : 'none';
+    }
+    if (consoleArrow) {
+      consoleArrow.textContent = consoleOpen ? '▼ Recolher' : '► Expandir';
+    }
+    if (debugLogsDrawer) {
+      debugLogsDrawer.classList.toggle('expanded', consoleOpen);
+    }
+    if (consoleOpen) {
+      scrollConsoleToBottom();
+    }
+  }
+
   if (btnToggleConsole) {
     btnToggleConsole.addEventListener('click', () => {
-      consoleOpen = !consoleOpen;
-      consoleBody.style.display = consoleOpen ? 'block' : 'none';
-      consoleArrow.textContent = consoleOpen ? '▼' : '►';
+      setConsoleOpen(!consoleOpen);
     });
   }
+
+  if (btnNavToggleLogs) {
+    btnNavToggleLogs.addEventListener('click', () => {
+      setConsoleOpen(true);
+      if (debugLogsDrawer) {
+        debugLogsDrawer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+
+  if (btnScrollToLogs) {
+    btnScrollToLogs.addEventListener('click', () => {
+      setConsoleOpen(true);
+      if (debugLogsDrawer) {
+        debugLogsDrawer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+
+  // 6. Botão de Copiar Logs para Suporte
+  if (btnCopyLogs) {
+    btnCopyLogs.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await copyLogsToClipboard();
+    });
+  }
+
+  if (btnClearLogs) {
+    btnClearLogs.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (consoleOutput) {
+        consoleOutput.textContent = '[INFO] Janela de logs limpa.\n';
+        totalLogEvents = 1;
+        if (logsCountBadge) logsCountBadge.textContent = '1 evento';
+      }
+    });
+  }
+
+  async function copyLogsToClipboard() {
+    if (!consoleOutput) return;
+    const rawLogs = consoleOutput.textContent.trim();
+    const timestamp = new Date().toLocaleString('pt-BR');
+    const fullReport = [
+      `=======================================================`,
+      `  LOGS DE DIAGNÓSTICO DO APP (SPOTIFY & INPI PROSPECTOR)`,
+      `=======================================================`,
+      `Data/Hora: ${timestamp}`,
+      `URL: ${window.location.href}`,
+      `Navegador: ${navigator.userAgent}`,
+      `Job ID: ${currentJobId || 'Nenhum job recente'}`,
+      `Tipo de Entrada: ${currentTargetType}`,
+      `Total Artistas: ${allArtists.length}`,
+      `-------------------------------------------------------`,
+      `HISTÓRICO COMPLETO DOS EVENTOS:`,
+      `-------------------------------------------------------`,
+      rawLogs || '(Nenhum log registrado até o momento)'
+    ].join('\n');
+
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(fullReport);
+        copied = true;
+      }
+    } catch (_) {}
+
+    if (!copied) {
+      try {
+        const tempText = document.createElement('textarea');
+        tempText.value = fullReport;
+        tempText.style.position = 'fixed';
+        tempText.style.left = '-9999px';
+        document.body.appendChild(tempText);
+        tempText.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempText);
+        copied = true;
+      } catch (_) {}
+    }
+
+    if (copied) {
+      btnCopyLogs.classList.add('copied');
+      if (btnCopyLogsText) btnCopyLogsText.textContent = '✓ Logs Copiados com Sucesso!';
+      setTimeout(() => {
+        btnCopyLogs.classList.remove('copied');
+        if (btnCopyLogsText) btnCopyLogsText.textContent = '📋 Copiar Todos os Logs';
+      }, 2500);
+    } else {
+      alert('Não foi possível copiar automaticamente para a área de transferência. Selecione o texto e copie manualmente.');
+    }
+  }
+
+  // Captura erros globais do navegador e anexa aos logs para debug
+  window.addEventListener('error', (e) => {
+    appendLog(`[ERRO NAVEGADOR] ${e.message} (${e.filename}:${e.lineno})`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    appendLog(`[ERRO PROMISE] ${e.reason}`);
+  });
 
   // 6. Iniciar Pipeline
   btnStartPipeline.addEventListener('click', async () => {
@@ -260,7 +397,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     allArtists = [];
     renderTable();
-    consoleOutput.textContent = 'Conectando ao serviço em streaming contínuo...\n';
+    totalLogEvents = 0;
+    if (consoleOutput) consoleOutput.textContent = '';
+    appendLog('[INÍCIO] Conectando ao serviço em streaming contínuo...');
     
     progressSection.style.display = 'block';
     resultsSection.style.display = 'none';
@@ -443,8 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (eventType === 'progress') {
               updateProgress(data);
             } else if (eventType === 'log') {
-              consoleOutput.textContent += data.line + '\n';
-              scrollConsoleToBottom();
+              appendLog(data.line);
             } else if (eventType === 'artist_done') {
               if (data.progress) updateProgress(data.progress);
               if (data.current_artist) updateSpotlight(data.current_artist);
@@ -506,8 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = JSON.parse(e.data);
       if (data.progress) updateProgress(data.progress);
       if (data.logs && data.logs.length > 0) {
-        consoleOutput.textContent = data.logs.join('\n') + '\n';
-        scrollConsoleToBottom();
+        data.logs.forEach(l => appendLog(l));
       }
     });
 
@@ -518,8 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     activeEventSource.addEventListener('log', (e) => {
       const data = JSON.parse(e.data);
-      consoleOutput.textContent += data.line + '\n';
-      scrollConsoleToBottom();
+      appendLog(data.line);
     });
 
     activeEventSource.addEventListener('artist_done', (e) => {
