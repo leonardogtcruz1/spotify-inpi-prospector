@@ -46,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCopyLogsText = document.getElementById('btnCopyLogsText');
   const btnClearLogs = document.getElementById('btnClearLogs');
   const btnNavToggleLogs = document.getElementById('btnNavToggleLogs');
-  const btnScrollToLogs = document.getElementById('btnScrollToLogs');
 
   // Error Banner Elements (Vermelho vivo)
   const errorBannerCard = document.getElementById('errorBannerCard');
@@ -263,15 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnNavToggleLogs) {
     btnNavToggleLogs.addEventListener('click', () => {
-      setConsoleOpen(true);
-      if (debugLogsDrawer) {
-        debugLogsDrawer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    });
-  }
-
-  if (btnScrollToLogs) {
-    btnScrollToLogs.addEventListener('click', () => {
       setConsoleOpen(true);
       if (debugLogsDrawer) {
         debugLogsDrawer.scrollIntoView({ behavior: 'smooth', block: 'center' });
