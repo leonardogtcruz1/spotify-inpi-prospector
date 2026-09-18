@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabContents = document.querySelectorAll('.tab-content');
   const playlistUrlInput = document.getElementById('playlistUrlInput');
   const btnClearUrl = document.getElementById('btnClearUrl');
-  const pillBtns = document.querySelectorAll('.pill-btn');
   
   const dropZone = document.getElementById('dropZone');
   const fileInput = document.getElementById('fileInput');
@@ -161,21 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
       playlistUrlInput.focus();
     });
   }
-
-  // 4. Example Pills
-  pillBtns.forEach(pill => {
-    pill.addEventListener('click', () => {
-      const url = pill.getAttribute('data-url');
-      playlistUrlInput.value = url;
-      if (btnLoadTop50) {
-        if (url.includes('37i9dQZEVXbMXbN3EUUhlg')) {
-          btnLoadTop50.classList.add('selected');
-        } else {
-          btnLoadTop50.classList.remove('selected');
-        }
-      }
-    });
-  });
 
   // 4. Drag & Drop File Handling
   if (dropZone) {
