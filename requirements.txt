@@ -1,0 +1,7 @@
+openpyxl>=3.1.2
+requests>=2.31.0
+spotipy>=2.23.0
+spotifyscraper>=3.9.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9

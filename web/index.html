@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Spotify & INPI Lead Prospector | Automação de Planilhas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Persistent Glowing Top Progress Line (Indica visualmente se está rodando) -->
+  <div class="top-progress-container" id="topProgressContainer" style="display: none;">
+    <div class="top-progress-bar" id="topProgressBar"></div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Top Navigation -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.435-5.308-1.76-8.793-.963-.335.077-.67-.133-.746-.468-.077-.334.132-.67.467-.746 3.808-.87 7.076-.496 9.722 1.115.294.18.386.562.207.855zm1.224-2.723c-.226.367-.706.482-1.072.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.127-.849-.106-.974-.518-.127-.413.107-.849.519-.974 3.632-1.102 8.147-.568 11.235 1.329.366.226.481.707.257 1.072zm.105-2.835C14.692 8.95 9.08 8.761 5.823 9.75c-.494.15-1.018-.129-1.168-.622-.15-.494.129-1.018.622-1.168 3.732-1.133 9.943-.912 13.728 1.334.444.263.59.84.327 1.284-.264.443-.841.59-1.285.327z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Spotify & INPI Prospector</h1>
+          <span class="badge-tag">Automação Inteligente v2.0</span>
+        </div>
+      </div>
+
+      <!-- Live Running Pill -->
+      <div class="header-status-pill" id="headerStatusPill" style="display: none;">
+        <span class="status-indicator live-pulse"></span>
+        <span id="headerStatusText">Executando ao vivo...</span>
+      </div>
+      
+      <div class="nav-actions">
+        <button id="btnOpenHistory" class="nav-btn">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Histórico de Planilhas
+        </button>
+        <button id="btnOpenConfig" class="nav-btn icon-only" title="Configurações da API">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      
+      <!-- HERO / INPUT CARD -->
+      <section class="card input-card" id="inputSection">
+        <div class="card-header">
+          <h2>Criar Nova Planilha Automatizada</h2>
+          <p class="subtitle">Insira uma playlist do Spotify ou envie uma planilha do Chosic para extrair métricas de ouvintes, redes sociais e prospecção de marcas no INPI.</p>
+        </div>
+
+        <!-- Input Mode Tabs -->
+        <div class="tabs-nav">
+          <button class="tab-btn active" data-tab="playlistTab">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm3.8 14.5a.75.75 0 0 1-1.04.25c-2.85-1.74-6.44-2.14-10.66-1.17a.75.75 0 0 1-.34-1.46c4.62-1.06 8.6-.61 11.79 1.34a.75.75 0 0 1 .25 1.04zm1.5-3.33a.94.94 0 0 1-1.29.31c-3.26-2-8.22-2.58-12.08-1.41a.94.94 0 0 1-.55-1.8c4.4-1.34 9.87-.7 13.61 1.61a.94.94 0 0 1 .31 1.29zm.13-3.47C13.6 7.4 7.2 7.18 3.5 8.3a1.13 1.13 0 1 1-.65-2.16c4.27-1.3 11.33-1.04 15.65 1.52a1.13 1.13 0 0 1-1.07 2.04z"/>
+            </svg>
+            Link da Playlist (Recomendado)
+          </button>
+          <button class="tab-btn" data-tab="fileTab">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Enviar Arquivo (.xlsx / .csv)
+          </button>
+        </div>
+
+        <!-- Tab 1: Playlist Link Form -->
+        <div class="tab-content active" id="playlistTab">
+          <div class="form-group">
+            <label for="playlistUrlInput">URL da Playlist do Spotify:</label>
+            <div class="input-with-icon">
+              <input 
+                type="url" 
+                id="playlistUrlInput" 
+                placeholder="Ex: https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd"
+                value="https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd"
+              >
+              <button class="btn-clear" id="btnClearUrl" type="button" title="Limpar">✕</button>
+            </div>
+            <div class="input-hint">
+              <span>💡 Dica: Funciona com RapCaviar, Esquenta Sertanejo, Top Brasil, Viva Latino e playlists de usuários sem precisar de API.</span>
+            </div>
+          </div>
+
+          <div class="quick-examples">
+            <span class="examples-label">Testar com exemplos:</span>
+            <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd">RapCaviar</button>
+            <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC">Viva Latino</button>
+            <button class="pill-btn" data-url="https://open.spotify.com/playlist/37i9dQZF1DWYkaDif7Ztbp">Afro Hits</button>
+          </div>
+        </div>
+
+        <!-- Tab 2: File Upload Form -->
+        <div class="tab-content" id="fileTab">
+          <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept=".xlsx,.csv" style="display: none;">
+            <div class="drop-content">
+              <div class="drop-icon">
+                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <p class="drop-title">Arraste a planilha do Chosic aqui ou <span class="browse-link">clique para selecionar</span></p>
+              <span class="drop-hint">Formatos suportados: .xlsx ou .csv</span>
+              <div class="file-chip" id="fileChip" style="display: none;">
+                <span class="chip-name" id="fileNameText">arquivo.xlsx</span>
+                <button class="chip-remove" id="btnRemoveFile" type="button">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Common Options & Submit -->
+        <div class="form-footer">
+          <div class="options-row">
+            <label class="toggle-control">
+              <input type="checkbox" id="skipLiveInpiCheckbox" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">
+                <strong>Modo Rápido INPI</strong> (Usa histórico local + links inteligentes diretos de 1 clique)
+              </span>
+            </label>
+          </div>
+
+          <button class="btn-primary" id="btnStartPipeline">
+            <span class="btn-icon">🚀</span>
+            <span class="btn-text">Iniciar Automação Completa</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- LIVE PROGRESS & CURRENT ARTIST SECTION (Hidden by default) -->
+      <section class="card progress-card" id="progressSection" style="display: none;">
+        <div class="progress-header">
+          <div class="progress-info">
+            <span class="status-indicator live-pulse"></span>
+            <div>
+              <h3 id="progressStepTitle">Iniciando processamento...</h3>
+              <p class="progress-subtitle" id="progressSubtitle">Aguarde enquanto os dados são extraídos em tempo real...</p>
+            </div>
+          </div>
+          <div class="progress-badge" id="progressPercentBadge">0%</div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+        </div>
+
+        <!-- Current Artist Spotlight Card -->
+        <div class="artist-spotlight" id="artistSpotlight">
+          <div class="spotlight-badge">Analisando agora:</div>
+          <div class="spotlight-grid">
+            <div class="spotlight-artist">
+              <div class="artist-avatar" id="spotlightAvatar">🎵</div>
+              <div>
+                <h4 id="spotlightName">Carregando artistas...</h4>
+                <span class="spotlight-tag" id="spotlightMarcaTag">Verificando marcas...</span>
+              </div>
+            </div>
+            <div class="spotlight-metrics">
+              <div class="metric-pill">
+                <span class="m-label">Ouvintes:</span>
+                <span class="m-val" id="spotlightListeners">-</span>
+              </div>
+              <div class="metric-pill">
+                <span class="m-label">Instagram:</span>
+                <span class="m-val" id="spotlightIG">-</span>
+              </div>
+              <div class="metric-pill">
+                <span class="m-label">YouTube:</span>
+                <span class="m-val" id="spotlightYT">-</span>
+              </div>
+              <div class="metric-pill">
+                <span class="m-label">TikTok:</span>
+                <span class="m-val" id="spotlightTikTok">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terminal Console Drawer -->
+        <div class="console-drawer">
+          <div class="console-header" id="btnToggleConsole">
+            <div class="console-title">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              Logs de Execução ao Vivo
+            </div>
+            <span class="toggle-arrow" id="consoleArrow">▼</span>
+          </div>
+          <div class="console-body" id="consoleBody">
+            <pre class="console-output" id="consoleOutput">Conectando ao serviço...</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTS & SUMMARY STATS SECTION (Hidden by default) -->
+      <section class="card results-card" id="resultsSection" style="display: none;">
+        <div class="results-banner">
+          <div class="banner-text">
+            <div class="celebration-badge">✓ Processamento Concluído</div>
+            <h2>Planilha Pronta para Download!</h2>
+            <p id="resultsFilenameText">Arquivo gerado com as 4 abas completas e hiperlinks clicáveis.</p>
+          </div>
+          <div class="banner-action">
+            <a href="#" class="btn-download" id="btnDownloadFile" download>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Baixar Planilha Excel (.xlsx)</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon tracks-icon">🎶</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statTracks">0</span>
+              <span class="stat-label">Faixas na Playlist</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon artists-icon">👥</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statArtists">0</span>
+              <span class="stat-label">Artistas Únicos</span>
+            </div>
+          </div>
+          <div class="stat-card lead-card highlight">
+            <div class="stat-icon lead-icon">🎯</div>
+            <div class="stat-content">
+              <span class="stat-value lead-val" id="statSemMarca">0</span>
+              <span class="stat-label lead-lbl">Leads Sem Marca (Oportunidades)</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon marcas-icon">🛡</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statComMarca">0</span>
+              <span class="stat-label">Artistas Com Marca</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Preview Table -->
+        <div class="table-container">
+          <div class="table-toolbar">
+            <div class="table-filters">
+              <button class="filter-btn active" data-filter="all">Todos (<span id="countFilterAll">0</span>)</button>
+              <button class="filter-btn lead-filter" data-filter="sem_marca">🎯 Sem Marca / Leads (<span id="countFilterLeads">0</span>)</button>
+              <button class="filter-btn" data-filter="com_marca">🛡 Com Marca (<span id="countFilterMarcas">0</span>)</button>
+            </div>
+            <div class="table-search">
+              <input type="text" id="tableSearchInput" placeholder="Filtrar por nome do artista...">
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table class="data-table" id="artistsTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Artista</th>
+                  <th>Músicas</th>
+                  <th>Ouvintes Spotify</th>
+                  <th>Instagram</th>
+                  <th>YouTube</th>
+                  <th>TikTok</th>
+                  <th>Status INPI</th>
+                </tr>
+              </thead>
+              <tbody id="artistsTableBody">
+                <!-- Rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- History Drawer / Modal -->
+    <div class="modal-overlay" id="historyModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Histórico de Planilhas Geradas</h3>
+          <button class="btn-close-modal" id="btnCloseHistory">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="history-list" id="historyList">
+            <p class="empty-state">Carregando histórico...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spotify API Config Modal -->
+    <div class="modal-overlay" id="configModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Configurações do Spotify Developer</h3>
+          <button class="btn-close-modal" id="btnCloseConfig">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Playlists públicas regulares funcionam automaticamente sem API. Para gráficos oficiais do Spotify (como Top 50 Brasil oficial `37i9dQZEVX...`), você pode salvar suas chaves gratuitas aqui:</p>
+          <div class="form-group">
+            <label for="cfgClientId">Client ID:</label>
+            <input type="text" id="cfgClientId" placeholder="Cole seu Client ID">
+          </div>
+          <div class="form-group">
+            <label for="cfgClientSecret">Client Secret:</label>
+            <input type="password" id="cfgClientSecret" placeholder="Cole seu Client Secret">
+          </div>
+          <div class="config-actions">
+            <button class="btn-secondary" id="btnCancelConfig">Cancelar</button>
+            <button class="btn-primary" id="btnSaveConfig">Salvar Credenciais</button>
+          </div>
+          <div id="configStatusMessage" class="status-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <p>Spotify & INPI Lead Prospector • Automação com Inteligência de Dados e Prospecção de Marcas</p>
+    </footer>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

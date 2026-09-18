@@ -1,0 +1,30 @@
+======================================================================
+  ROBÔ AUTOMATIZADOR SPOTIFY & MARCAS INPI (COM PAINEL WEB)
+======================================================================
+
+COMO USAR NO DIA A DIA (ESCOLHA A SUA FORMA PREFERIDA):
+
+🌟 OPÇÃO 1: NOVO PAINEL WEB NO NAVEGADOR (MAIS FÁCIL E VISUAL)
+1. No Mac: dê 2 cliques no arquivo "iniciar_web.command".
+   No Windows: dê 2 cliques no arquivo "iniciar_web.bat".
+2. Seu navegador abrirá automaticamente com o painel visual!
+3. Cole o link da playlist (ou arraste a planilha) e clique em INICIAR.
+4. Acompanhe os artistas e ouvintes sendo buscados ao vivo na tela.
+5. Quando terminar, clique no botão para baixar a planilha (.xlsx)!
+
+----------------------------------------------------------------------
+
+OPÇÃO 2: DIRETO PELO TERMINAL / EXECUTOR RÁPIDO
+- No Mac: dê 2 cliques em "executar.command"
+- No Windows: dê 2 cliques em "executar.bat"
+- Cole o link da playlist do Spotify e aperte ENTER (ou apenas aperte
+  ENTER para usar uma planilha que você colocou na pasta).
+
+ONDE FICA SUA PLANILHA PRONTA:
+- Fica salva na pasta "output/" e pode ser baixada direto pelo painel web!
+- Contém as 4 abas estruturadas, com ouvintes mensais do Spotify,
+  redes sociais e links de marcas no INPI com formatação visual pronta.
+
+----------------------------------------------------------------------
+Dúvidas detalhadas? Leia o arquivo completo "COMO_USAR.md".
+======================================================================

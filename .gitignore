@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+*.zip
+uploads/
+.vercel/
+spotify_config.json
+output/test_*
+output/*automatizada*.xlsx
