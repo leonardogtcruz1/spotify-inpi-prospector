@@ -376,20 +376,66 @@ document.addEventListener('DOMContentLoaded', () => {
       resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-    activeEventSource.addEventListener('error', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        alert(`Erro durante a execução: ${data.message}`);
-      } catch {
-        console.warn('Conexão SSE encerrada.');
-      }
+    activeEventSource.onerror = async () => {
+      console.warn('Conexão SSE oscilou. Verificando status do processamento via API...');
       activeEventSource.close();
+
+      // Tenta consultar o status do job via HTTP por algumas tentativas
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          await new Promise(r => setTimeout(r, 2000));
+          const res = await fetch(`/api/jobs/${jobId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'completed') {
+              progressBarFill.style.width = '100%';
+              progressPercentBadge.textContent = '100%';
+              progressStepTitle.textContent = 'Processamento Concluído com Sucesso!';
+              progressSubtitle.textContent = 'Download da planilha iniciado automaticamente!';
+
+              if (topProgressBar) topProgressBar.style.width = '100%';
+              setTimeout(() => {
+                if (topProgressContainer) topProgressContainer.style.display = 'none';
+              }, 2500);
+
+              if (headerStatusPill) headerStatusPill.style.display = 'none';
+              document.title = '✓ Concluído! | Spotify & INPI Prospector';
+
+              btnStartPipeline.disabled = false;
+              btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Nova Automação';
+
+              resultsSection.style.display = 'block';
+              resultsFilenameText.textContent = `Arquivo pronto: ${data.output_filename} (Download iniciado automaticamente)`;
+              btnDownloadFile.href = data.download_url;
+              btnDownloadFile.setAttribute('download', data.output_filename);
+
+              if (data.summary) {
+                updateStats(data.summary);
+              }
+
+              triggerAutoDownload(data);
+              resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              return;
+            } else if (data.status === 'error') {
+              alert(`Erro: ${data.error || 'Falha no processamento'}`);
+              break;
+            } else if (data.status === 'running') {
+              // Reconecta o streaming
+              listenToJobEvents(jobId);
+              return;
+            }
+          }
+        } catch {
+          // Próxima tentativa
+        }
+      }
+
       if (topProgressContainer) topProgressContainer.style.display = 'none';
       if (headerStatusPill) headerStatusPill.style.display = 'none';
       document.title = 'Spotify & INPI Lead Prospector';
       btnStartPipeline.disabled = false;
       btnStartPipeline.innerHTML = '<span class="btn-icon">🚀</span> Iniciar Automação Completa';
-    });
+    };
   }
 
   function updateProgress(progress) {

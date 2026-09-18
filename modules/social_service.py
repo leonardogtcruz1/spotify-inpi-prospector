@@ -92,28 +92,22 @@ def format_ig_count(count_str):
 
 def scrape_ig_followers(handle, artist_name=''):
     """
-    Busca e extrai a quantidade de seguidores no Instagram a partir do @handle e/ou nome do artista.
+    Busca e extrai a quantidade de seguidores no Instagram a partir do @handle de forma rápida.
     """
     if not handle:
         return None
     clean_handle = handle.lower().lstrip('@').rstrip('/')
-    clean_artist = re.sub(r'^(?:mc|dj)\s+', '', str(artist_name).lower()).strip() if artist_name else ''
 
     queries = [
         f'site:instagram.com/{clean_handle}',
-        f'\"instagram.com/{clean_handle}\"',
-        f'@{clean_handle} instagram',
-        f'@{clean_handle} instagram followers',
-        f'{clean_artist} instagram' if clean_artist and len(clean_artist) > 3 else None
+        f'@{clean_handle} instagram'
     ]
 
     for q in queries:
-        if not q:
-            continue
         url = f'https://search.yahoo.com/search?p={urllib.parse.quote(q)}'
         req = urllib.request.Request(url, headers=DESKTOP_HEADERS)
         try:
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
                 page = resp.read().decode('utf-8', errors='ignore')
                 snippets = re.findall(r'<div class=\"compText[^\"]*\"[^>]*>(.*?)</div>', page)
 
@@ -137,10 +131,8 @@ def scrape_ig_followers(handle, artist_name=''):
                             return format_ig_count(val)
         except Exception:
             pass
-        time.sleep(0.1)
 
     return None
-
 
 
 def get_tiktok_followers(tiktok_url_or_handle):
@@ -158,7 +150,7 @@ def get_tiktok_followers(tiktok_url_or_handle):
 
     req = urllib.request.Request(url, headers=DESKTOP_HEADERS)
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
             html = resp.read().decode('utf-8', errors='ignore')
             m = re.findall(r'\"followerCount\":([0-9]+)', html)
             if m:
@@ -172,26 +164,17 @@ def get_tiktok_followers(tiktok_url_or_handle):
 
 def discover_tiktok_from_ig(ig_url):
     """
-    Tenta descobrir o perfil do TikTok usando variações do @handle do Instagram
+    Tenta descobrir o perfil do TikTok usando o @handle do Instagram
     """
     handle = extract_ig_handle(ig_url)
     if not handle:
         return None, None
 
-    candidates = [
-        handle,
-        f"{handle}oficial",
-        f"dj{handle}" if not handle.startswith('dj') else handle,
-        f"mc{handle}" if not handle.startswith('mc') else handle,
-        f"{handle}.ofc"
-    ]
+    count_str, url = get_tiktok_followers(handle)
+    if count_str:
+        return count_str, url
 
-    for cand in candidates[:3]:
-        count_str, url = get_tiktok_followers(cand)
-        if count_str:
-            return count_str, url
-
-    return None, None
+    return None, f"https://www.tiktok.com/@{handle}"
 
 
 def load_known_socials_from_excel(file_path):
@@ -273,7 +256,7 @@ def discover_youtube_channel(artist_name):
     url = f"https://www.youtube.com/results?search_query={query}"
     req = urllib.request.Request(url, headers=DESKTOP_HEADERS)
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
             html = resp.read().decode('utf-8', errors='ignore')
 
             channel_url = None

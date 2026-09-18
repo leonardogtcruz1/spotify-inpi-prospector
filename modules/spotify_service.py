@@ -70,7 +70,7 @@ def get_artist_spotify_info(artist_id):
     }
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
             html = resp.read().decode('utf-8', errors='ignore')
 
             # 1. Ouvintes Mensais

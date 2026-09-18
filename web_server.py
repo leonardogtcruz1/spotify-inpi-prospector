@@ -222,11 +222,16 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
             except Exception:
                 inpi_session = None
 
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         artists_data = {}
         sem_marca_count = 0
         com_marca_count = 0
+        completed_count = 0
+        start_time = time.time()
+        time_limit = 240 if IS_VERCEL else 1800
 
-        for idx, name in enumerate(unique_artists, 1):
+        def enrich_single_artist(name):
             norm_name = normalize_text(name)
             aid = artist_spotify_ids.get(norm_name)
 
@@ -234,7 +239,7 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
                 tid = artist_tracks_map[norm_name]
                 if tid not in resolved_track_cache:
                     resolved_track_cache[tid] = get_artists_from_track_page(tid)
-                found = resolved_track_cache[tid]
+                found = resolved_track_cache.get(tid, {})
                 for f_name, f_id in found.items():
                     if normalize_text(f_name) == norm_name or norm_name in normalize_text(f_name):
                         aid = f_id
@@ -271,15 +276,9 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
 
             search_url = build_inpi_direct_url(name)
             count_val = artist_counts[name]
+            tem_marca = bool(inpi_records)
 
-            if inpi_records:
-                com_marca_count += 1
-                tem_marca = True
-            else:
-                sem_marca_count += 1
-                tem_marca = False
-
-            artist_entry = {
+            return {
                 'name': name,
                 'count': count_val,
                 'count_display': str(count_val) if count_val > 1 else "",
@@ -299,41 +298,69 @@ def run_pipeline_sync(job_id: str, target_type: str, target_value: str, skip_liv
                 'inpi_search_url': search_url
             }
 
-            artists_data[name] = artist_entry
-            job["artists"].append(artist_entry)
-            job["summary"]["sem_marca"] = sem_marca_count
-            job["summary"]["com_marca"] = com_marca_count
+        max_workers = 6
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_artist = {executor.submit(enrich_single_artist, name): name for name in unique_artists}
 
-            # Calcula percentual de 30% a 90%
-            pct = 30 + int((idx / total_artists) * 60)
-            job["progress"] = {
-                "step": 4,
-                "step_name": f"Processando artistas ({idx}/{total_artists})",
-                "current_artist_idx": idx,
-                "total_artists": total_artists,
-                "percent": pct
-            }
-            job["current_artist"] = {
-                "name": name,
-                "listeners": artist_entry["monthly_listeners_fmt"],
-                "ig": artist_entry["ig_display"],
-                "yt": artist_entry["youtube_display"],
-                "tiktok": artist_entry["tiktok_display"],
-                "marca": "Com Marca" if tem_marca else "Sem Marca"
-            }
+            for future in as_completed(future_to_artist):
+                name = future_to_artist[future]
+                completed_count += 1
+                try:
+                    artist_entry = future.result()
+                except Exception as ex:
+                    search_url = build_inpi_direct_url(name)
+                    count_val = artist_counts[name]
+                    artist_entry = {
+                        'name': name, 'count': count_val, 'count_display': str(count_val) if count_val > 1 else "",
+                        'monthly_listeners': None, 'monthly_listeners_fmt': 'N/D', 'spotify_url': None,
+                        'instagram': None, 'ig_display': 'N/D', 'ig_url': None,
+                        'tiktok_url': None, 'tiktok_display': 'N/D', 'youtube_url': None, 'youtube_display': 'N/D',
+                        'tem_marca': False, 'inpi_status': 'SEM MARCA', 'inpi_records': None,
+                        'inpi_search_url': search_url
+                    }
 
-            broadcast_event(job_id, "artist_done", {
-                "artist": artist_entry,
-                "progress": job["progress"],
-                "summary": job["summary"],
-                "current_artist": job["current_artist"]
-            })
+                if artist_entry['tem_marca']:
+                    com_marca_count += 1
+                else:
+                    sem_marca_count += 1
 
-            append_job_log(
-                job,
-                f"[{idx:02d}/{total_artists:02d}] {name} | Ouvintes: {artist_entry['monthly_listeners_fmt']} | IG: {artist_entry['ig_display']} | YT: {artist_entry['youtube_display']} | {'MARCA' if tem_marca else 'S/ MARCA'}"
-            )
-            time.sleep(0.05)
+                artists_data[name] = artist_entry
+                job["artists"].append(artist_entry)
+                job["summary"]["sem_marca"] = sem_marca_count
+                job["summary"]["com_marca"] = com_marca_count
+
+                pct = 30 + int((completed_count / total_artists) * 60)
+                job["progress"] = {
+                    "step": 4,
+                    "step_name": f"Processando artistas ({completed_count}/{total_artists})",
+                    "current_artist_idx": completed_count,
+                    "total_artists": total_artists,
+                    "percent": pct
+                }
+                job["current_artist"] = {
+                    "name": name,
+                    "listeners": artist_entry["monthly_listeners_fmt"],
+                    "ig": artist_entry["ig_display"],
+                    "yt": artist_entry["youtube_display"],
+                    "tiktok": artist_entry["tiktok_display"],
+                    "marca": "Com Marca" if artist_entry['tem_marca'] else "Sem Marca"
+                }
+
+                broadcast_event(job_id, "artist_done", {
+                    "artist": artist_entry,
+                    "progress": job["progress"],
+                    "summary": job["summary"],
+                    "current_artist": job["current_artist"]
+                })
+
+                append_job_log(
+                    job,
+                    f"[{completed_count:02d}/{total_artists:02d}] {name} | Ouvintes: {artist_entry['monthly_listeners_fmt']} | IG: {artist_entry['ig_display']} | YT: {artist_entry['youtube_display']} | {'MARCA' if artist_entry['tem_marca'] else 'S/ MARCA'}"
+                )
+
+                if time.time() - start_time > time_limit:
+                    append_job_log(job, "[!] Limite de tempo de execução alcançado. Finalizando planilha agora...")
+                    break
 
         # 5. Geração da Planilha Excel
         job["progress"] = {"step": 5, "step_name": "Construindo planilha Excel final", "percent": 95}
