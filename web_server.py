@@ -590,7 +590,25 @@ async def set_spotify_config(
 
 
 # Servir Frontend Estático
-app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+@app.get("/static/style.css")
+async def serve_css():
+    css_path = os.path.join(WEB_DIR, "style.css")
+    if os.path.exists(css_path):
+        return FileResponse(css_path, media_type="text/css")
+    raise HTTPException(status_code=404, detail="CSS not found")
+
+
+@app.get("/static/app.js")
+async def serve_js():
+    js_path = os.path.join(WEB_DIR, "app.js")
+    if os.path.exists(js_path):
+        return FileResponse(js_path, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="JS not found")
+
+
+if os.path.exists(WEB_DIR):
+    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
 
 
 @app.get("/", response_class=HTMLResponse)

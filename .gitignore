@@ -10,3 +10,4 @@ uploads/
 spotify_config.json
 output/test_*
 output/*automatizada*.xlsx
+.vercel
